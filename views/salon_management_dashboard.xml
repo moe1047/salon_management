@@ -61,16 +61,7 @@
                                         </span>
                                     </div>
                                 </div>
-                                <div t-if="record.active_booking_chairs.raw_value == false">
-                                    <div class=" o_primary style_collection">
-                                        <span class=" o_primary style_collection">
-                                            <span class=" o_primary style_collection" style="float: left;">Free After (Hours) :</span>
-                                            <span class=" o_primary style_collection" style="float: center;">
-                                                <field name="total_time_taken_chair" widget="float_time"/>
-                                            </span>
-                                        </span>
-                                    </div>
-                                </div>
+                                
                                 <div t-if="record.active_booking_chairs.raw_value == true">
                                     <div class=" o_primary style_collection_booking">
                                         <span class=" o_primary style_collection_booking">

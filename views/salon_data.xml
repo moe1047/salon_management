@@ -49,7 +49,7 @@
     <data noupdate="1">
         <record model="salon.sequence.updater" id="salon_sequence_updater_01">
           <field name="name">Salon Sequence Updater</field>
-          <field name="sequence_salon">Chair-1</field>
+          <field name="sequence_salon">Artist-1</field>
         </record>
     </data>
 </odoo>

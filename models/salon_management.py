@@ -20,6 +20,7 @@
 #    If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
+import requests
 from datetime import date, datetime, timedelta
 from odoo import models, fields, api
 from odoo.tools.translate import _
@@ -175,9 +176,9 @@ class SalonOrder(models.Model):
 
     name = fields.Char(string='Salon', required=True, copy=False, readonly=True,
                        default='Draft Salon Order')
-    start_time = fields.Datetime(string="Start time", default=date.today(), required=True)
+    start_time = fields.Datetime(string="Start time", default=datetime.now(), required=True)
     end_time = fields.Datetime(string="End time")
-    date = fields.Datetime(string="Date", required=True, default=date.today())
+    date = fields.Datetime(string="Date", required=True, default=datetime.now())
     color = fields.Integer(string="Colour", default=6)
     partner_id = fields.Many2one('res.partner', string="Customer", required=False,
                                  help="If the customer is a regular customer, "
@@ -201,6 +202,15 @@ class SalonOrder(models.Model):
     chair_user = fields.Many2one('res.users', string="Artist User")
     salon_order_created_user = fields.Integer(string="Salon Order Created User",
                                               default=lambda self: self._uid)
+    deposit = fields.Float(string="Deposit")
+    invoiced = fields.Boolean(string='Invoiced',default=False)
+    state = fields.Selection([
+        ('draft', 'Draft'),
+        ('scheduled', 'Scheduled'),
+        ('closed', 'Closed'),
+        ('cancelled', 'Cancelled'),
+        ],default='draft')
+    _order = "start_time desc"
 
     @api.onchange('start_time')
     def start_date_change(self):
@@ -226,59 +236,89 @@ class SalonOrder(models.Model):
             'res_id': self.invoice_number,
         }
         return result
-
+    '''
     @api.multi
     def write(self, cr):
         if 'stage_id' in cr.keys():
+
             if self.stage_id.id == 3 and cr['stage_id'] != 4:
                 raise ValidationError(_("You can't perform that move !"))
             if self.stage_id.id == 1 and cr['stage_id'] not in [2, 5]:
                 raise ValidationError(_("You can't perform that move!"))
+
             if self.stage_id.id == 4:
                 raise ValidationError(_("You can't move a salon order from closed stage !"))
             if self.stage_id.id == 5:
                 raise ValidationError(_("You can't move a salon order from cancel stage !"))
+
             if self.stage_id.id == 2 and (cr['stage_id'] == 1 or cr['stage_id'] == 4):
                 raise ValidationError(_("You can't perform that move !"))
+
             if self.stage_id.id == 2 and cr['stage_id'] == 3 and self.inv_stage_identifier is False:
                 self.salon_invoice_create()
         if 'stage_id' in cr.keys() and self.name == "Draft Salon Order":
             if cr['stage_id'] == 2:
                 self.salon_confirm()
         return super(SalonOrder, self).write(cr)
-
+    '''
     @api.multi
     def salon_confirm(self):
+        #self.stage_id = 2
         sequence_code = 'salon.order.sequence'
         order_date = self.date
         order_date = order_date[0:10]
         self.name = self.env['ir.sequence'].with_context(ir_sequence_date=order_date).next_by_code(sequence_code)
-        if self.partner_id:
-            self.partner_id.partner_salon = True
-        self.stage_id = 2
-        self.chair_id.number_of_orders = len(self.env['salon.order'].search([("chair_id", "=", self.chair_id.id),
-                                                                             ("stage_id", "in", [2, 3])]))
-        self.chair_id.total_time_taken_chair = self.chair_id.total_time_taken_chair + self.time_taken_total
-        self.chair_user = self.chair_id.user_of_chair
+        self.write({
+            'state': 'scheduled',
+        })
+
+        balance_request = requests.post('http://api.sudogram.com:8000/v1/Services/GetBalance',
+        json={"USERID": "skylight1001","USERPWD":"RJ309X","ACCOUNT":"A2000009"})
+        if float(balance_request.json()["ACCOUNT-BALANCE"]) > 0:
+            r = requests.post('http://api.sudogram.com:8000/v1/Services/SendSms',
+                json={"USERID": "skylight1001","USERPWD":"RJ309X","ACCOUNT":"A2000009",
+                "MOBILENO":"0025263"+self.customer_number,
+                "MESSAGE":"Dear "+self.customer_name+" your appoitment has been confirmed -Warsan Boutique","CLIENT-REFERENCEID":"RF"})
+            if int(r.status_code) != 200 :
+                raise ValidationError('Request not completed')
+
+        else:
+            raise ValidationError('insufficient balance')
 
     @api.multi
     def salon_validate(self):
+        sequence_code = 'salon.order.sequence'
+        order_date = self.date
+        order_date = order_date[0:10]
+
+        self.name = self.env['ir.sequence'].with_context(ir_sequence_date=order_date).next_by_code(sequence_code)
+
         self.validation_controller = True
 
     @api.multi
     def salon_close(self):
-        self.stage_id = 4
+        #self.stage_id = 4
+        self.write({
+            'state': 'closed',
+        })
+        '''
         self.chair_id.number_of_orders = len(self.env['salon.order'].search([("chair_id", "=", self.chair_id.id),
                                                                              ("stage_id", "in", [2, 3])]))
         self.chair_id.total_time_taken_chair = self.chair_id.total_time_taken_chair - self.time_taken_total
+        '''
 
     @api.multi
     def salon_cancel(self):
-        self.stage_id = 5
+        self.write({
+            'state': 'cancelled',
+        })
+        '''
         self.chair_id.number_of_orders = len(self.env['salon.order'].search([("chair_id", "=", self.chair_id.id),
                                                                              ("stage_id", "in", [2, 3])]))
+
         if self.stage_id.id != 1:
             self.chair_id.total_time_taken_chair = self.chair_id.total_time_taken_chair - self.time_taken_total
+            '''
 
     @api.multi
     def button_total_update(self):
@@ -295,6 +335,15 @@ class SalonOrder(models.Model):
 
     @api.multi
     def salon_invoice_create(self):
+        '''
+        if self.partner_id:
+            self.partner_id.partner_salon = True
+
+        self.chair_id.number_of_orders = len(self.env['salon.order'].search([("chair_id", "=", self.chair_id.id),
+                                                                             ("stage_id", "in", [ 3])]))
+        self.chair_id.total_time_taken_chair = self.chair_id.total_time_taken_chair + self.time_taken_total
+        self.chair_user = self.chair_id.user_of_chair
+        '''
         inv_obj = self.env['account.invoice']
         inv_line_obj = self.env['account.invoice.line']
         if self.partner_id:
@@ -310,7 +359,7 @@ class SalonOrder(models.Model):
             'account_id': supplier.property_account_receivable_id.id,
             'partner_id': supplier.id,
             'currency_id': currency_salon,
-            'journal_id': 1,
+            'journal_id': self.env['account.journal'].search([('name', '=', 'Customer Invoices')], limit=1).id,
             'origin': self.name,
             'company_id': company_id.id,
         }
@@ -357,8 +406,8 @@ class SalonOrder(models.Model):
             result['res_id'] = inv_id.ids[0]
         else:
             result = {'type': 'ir.actions.act_window_close'}
+        self.invoiced = True
         self.inv_stage_identifier = True
-        self.stage_id = 3
         invoiced_records = self.env['salon.order'].search([('stage_id', 'in', [3, 4]),
                                                            ('chair_id', '=', self.chair_id.id)])
         total = 0
@@ -367,16 +416,20 @@ class SalonOrder(models.Model):
             invoiced_date = invoiced_date[0:10]
             if invoiced_date == str(date.today()):
                 total = total + rows.price_subtotal
+        '''
         self.chair_id.collection_today = total
         self.chair_id.number_of_orders = len(self.env['salon.order'].search([("chair_id", "=", self.chair_id.id),
-                                                                             ("stage_id", "in", [2, 3])]))
+                                                                             ("stage_id", "in", [ 3])]))
+        '''
         return result
 
     @api.multi
     def unlink(self):
         for order in self:
-            if order.stage_id.id == 3 or order.stage_id.id == 4:
-                raise UserError(_("You can't delete an invoiced salon order!"))
+            if order.invoiced:
+                raise UserError(_("You can't delete an invoiced order!"))
+            if order.state== "closed":
+                raise UserError(_("You can't delete closed order!"))
         return super(SalonOrder, self).unlink()
 
 
@@ -417,3 +470,70 @@ class SalonStages(models.Model):
     _name = 'salon.stages'
 
     name = fields.Char(string="Name", required=True, translate=True)
+class Payment(models.Model):
+    _inherit = 'account.payment'
+    cash_register_id = fields.Many2one('account.bank.statement',
+        ondelete='set null',domain=lambda self:[('state', '=', 'open'),('journal_id','=',self.journal_id.id),('date', '=', str(datetime.now().date())),('company_id','child_of',[self.env.user.company_id.id])])
+
+    registered = fields.Boolean(default=False)
+    register = fields.Boolean(default=True,string="Add to cash register")
+    @api.onchange('journal_id')
+    def _onchange_journal(self):
+        if self.journal_id:
+
+            self.currency_id = self.journal_id.currency_id or self.company_id.currency_id
+            # Set default payment method (we consider the first to be the default one)
+            payment_methods = self.payment_type == 'inbound' and self.journal_id.inbound_payment_method_ids or self.journal_id.outbound_payment_method_ids
+            self.payment_method_id = payment_methods and payment_methods[0] or False
+            # Set payment method domain (restrict to methods enabled for the journal and to selected payment type)
+            payment_type = self.payment_type in ('outbound', 'transfer') and 'outbound' or 'inbound'
+            user = self.env.user
+            for r in self:
+                payment_journal = r.journal_id.id
+                r.cash_register_id = self.env['account.bank.statement'].search([('state', '=', 'open'),('journal_id', '=', self.journal_id.id),('date', '=', str(datetime.now().date()))], limit=1)
+            return {
+            'domain': {
+            'payment_method_id': [('payment_type', '=', payment_type), ('id', 'in', payment_methods.ids)],
+            'cash_register_id': [('state', '=', 'open'),('journal_id', '=', self.journal_id.id),('date', '=', str(datetime.now().date())),('company_id','child_of',[self.env.user.company_id.id])]}
+            }
+        return {}
+    @api.multi
+    def post(self):
+        res = super(Payment, self).post()
+        cash_statement_line=self.env['account.bank.statement.line']
+        #company=self.env['res.company']._company_default_get('account.invoice')
+        for column in self:
+            cash_register_id=column.cash_register_id.id
+            date=column.payment_date
+
+        for r in self:
+            inserted_cash_statement_line=cash_statement_line.create({
+            'name':r.communication,
+            'amount':r.amount if r.payment_type == 'inbound' else r.amount * -1,
+            'date':date,
+            'ref':r.name,
+            'statement_id':cash_register_id,
+            'partner_id':r.partner_id.id,
+            })
+        self.write({
+            'registered': True,
+        })
+
+        return res
+    @api.onchange('payment_date')
+    def _onchange_payment_date(self):
+        for r in self:
+            payment_journal = r.journal_id.id
+            r.cash_register_id = self.env['account.bank.statement'].search(
+            [('state', '=', 'open'),
+            ('journal_id', '=', self.journal_id.id),
+            ('date', '=', str(self.payment_date))], limit=1)
+        return {
+        'domain': {
+        'cash_register_id': [
+        ('state', '=', 'open'),
+        ('journal_id', '=', self.journal_id.id),
+        ('date', '=', str(self.payment_date)),
+        ('company_id','child_of',[self.env.user.company_id.id])
+        ]}
+        }

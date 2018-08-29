@@ -21,7 +21,7 @@
 #
 ##############################################################################
 {
-    'name': 'Spa Management',
+    'name': 'Appointment Management',
     'summary': """Spa Management with Online Booking System""",
     'version': '10.0.2.0.0',
     'author': 'Vitek',
@@ -40,6 +40,7 @@
              'views/salon_email_template.xml',
              'views/salon_config.xml',
              'views/working_hours.xml',
+             'views/payment.xml',
              'security/ir.model.access.csv',
              ],
     'demo': [

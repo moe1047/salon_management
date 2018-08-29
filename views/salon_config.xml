@@ -10,7 +10,7 @@
                 <button string="Cancel" name="cancel" class="oe_link"/>
             </header>
             <div id="main">
-                <group string="Booking Chairs(Choose the chair when its free)">
+                <group string="Booking Artists(Choose the chair when its free)">
                     <field name="salon_booking_chairs" widget="many2many_checkboxes"/>
                 </group>
                 <group string="Holidays">

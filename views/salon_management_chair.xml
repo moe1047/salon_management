@@ -2,9 +2,9 @@
 <odoo>
     <data noupdate="1">
         <record id="sequence_chair" model="ir.sequence">
-            <field name="name">Chair Sequence</field>
+            <field name="name">Artist Sequence</field>
             <field name="code">chair.sequence</field>
-            <field name="prefix">Chair-</field>
+            <field name="prefix">Artist-</field>
             <field name="number_next">2</field>
             <field name="number_increment">1</field>
             <field name="padding">1</field>
@@ -78,7 +78,7 @@
             <field name="context">{}</field>
         </record>
         <record id="salon_chair_action" model="ir.actions.act_window">
-            <field name="name">Chair</field>
+            <field name="name">Artist</field>
             <field name="res_model">salon.chair</field>
             <field name="view_type">form</field>
             <field name="view_mode">tree,form</field>
@@ -86,6 +86,6 @@
         <menuitem id="salon_management_menu" name="Appointments"/>
         <menuitem id="salon_management_dashboard" parent="salon_management_menu" action="salon_dashboard_action"/>
         <menuitem id="salon_management_salon" name="Salon" parent="salon_management_menu"/>
-        <menuitem id="salon_management_chair" name="Chair" parent="salon_management_salon" action="salon_chair_action"/>
+        <menuitem id="salon_management_chair" name="Artists" parent="salon_management_salon" action="salon_chair_action"/>
     </data>
 </odoo>

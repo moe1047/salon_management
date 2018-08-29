@@ -22,7 +22,7 @@
             <script>$( function() {$( "#check_date" ).datepicker();} );</script>
             <t t-call="website.layout">
                 <div class="container">
-                    <h1 style="text-align:center;padding-bottom: 26px;padding-top: 20px;">Book Your Chair</h1>
+                    <h1 style="text-align:center;padding-bottom: 26px;padding-top: 20px;">Book Your Artist</h1>
                     <form>
                         <div class="form-group form-field o_website_form_required_custom">
                             <div class="col-md-12" style="margin-bottom:10px;">
@@ -132,7 +132,7 @@
                 </div>
                 <section id="chair_details">
                     <div class="container" style="margin-bottom:100px">
-                        <h1 style="text-align:center;">Available Chairs and Details</h1>
+                        <h1 style="text-align:center;">Available Artists and Details</h1>
                         <hr/>
                         <div class="form-group form-field o_website_form_required_custom">
                             <div class="col-md-12" style="margin-bottom:10px;">
