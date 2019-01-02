@@ -29,14 +29,37 @@ from odoo.exceptions import UserError, ValidationError
 
 class PartnerSalon(models.Model):
     _inherit = 'res.partner'
+    _sql_constraints = [
+         ('unique_mobile', 'UNIQUE(mobile)','This Mobile already exists')]
 
     partner_salon = fields.Boolean(string="Is a Salon Partner")
-
+    mobile = fields.Char(string="Mobile",required=True)
+    @api.multi
+    def name_get(self):
+        result = []
+        for record in self:
+            if record.mobile:
+                name =  str(record.mobile)  + ' - ' + record.name
+            else:
+                name = record.name
+            result.append((record.id, name))
+        return result
+    @api.model
+    def name_search(self, name, args=None, operator='ilike', limit=100):
+        args = args or []
+        recs = self.browse()
+        if name:
+            recs = self.search((args + ['|', ('mobile', 'ilike', name), ('name', 'ilike', name)]),
+                               limit=limit)
+        if not recs:
+            recs = self.search([('name', operator, name)] + args, limit=limit)
+        return recs.name_get()
 
 class SequenceUpdaterSalon(models.Model):
     _name = 'salon.sequence.updater'
 
     sequence_salon = fields.Char(string="Salon Sequence")
+
 
 
 class UserSalon(models.Model):
@@ -47,9 +70,7 @@ class UserSalon(models.Model):
 
 class SalonChair(models.Model):
     _name = 'salon.chair'
-
-    name = fields.Char(string="Chair", required=True,
-                       default=lambda self: self.env['salon.sequence.updater'].browse(1).sequence_salon or "Arist-1")
+    name = fields.Char(string="Artist name", required=True)
     number_of_orders = fields.Integer(string="No.of Orders")
     collection_today = fields.Float(string="Today's Collection")
     user_of_chair = fields.Many2one('res.users', string="User", readonly=True,
@@ -64,9 +85,11 @@ class SalonChair(models.Model):
 
     @api.model
     def create(self, cr):
+        '''
         sequence_code = 'chair.sequence'
         sequence_number = self.env['ir.sequence'].next_by_code(sequence_code)
         self.env['salon.sequence.updater'].browse(1).write({'sequence_salon': sequence_number})
+        '''
         if 'user_line' in cr.keys():
             if cr['user_line']:
                 date_changer = []
@@ -148,6 +171,17 @@ class SalonChairUserLines(models.Model):
 
 class SalonOrder(models.Model):
     _name = 'salon.order'
+    @api.model
+    def _get_default_branch_domain(self):
+        return [('id', 'in', self.env.user.branch_ids.ids)]
+
+    @api.model
+    def _get_default_branch(self):
+        user_obj = self.env['res.users']
+        branch_id = user_obj.browse(self.env.user.id).branch_id
+        return branch_id
+
+    branch_id=fields.Many2one('res.branch', 'Branch', default=_get_default_branch,domain=_get_default_branch_domain)
 
     @api.depends('order_line.price_subtotal')
     def sub_total_update(self):
@@ -180,10 +214,10 @@ class SalonOrder(models.Model):
     end_time = fields.Datetime(string="End time")
     date = fields.Datetime(string="Date", required=True, default=datetime.now())
     color = fields.Integer(string="Colour", default=6)
-    partner_id = fields.Many2one('res.partner', string="Customer", required=False,
+    partner_id = fields.Many2one('res.partner', string="Customer", required=True,
                                  help="If the customer is a regular customer, "
                                       "then you can add the customer in your database")
-    customer_name = fields.Char(string="Name", required=True)
+    customer_name = fields.Char(string="Name")
     customer_number = fields.Char(string='Ph.number')
     amount = fields.Float(string="Amount")
     chair_id = fields.Many2one('salon.chair', string="Artist")
@@ -191,7 +225,7 @@ class SalonOrder(models.Model):
     time_taken_total = fields.Float(string="Total time taken")
     note = fields.Text('Terms and conditions')
     order_line = fields.One2many('salon.order.lines', 'salon_order', string="Order Lines")
-    stage_id = fields.Many2one('salon.stages', string="Stages", default=1)
+    #stage_id = fields.Many2one('salon.stages', string="Stages", default=1)
     inv_stage_identifier = fields.Boolean(string="Stage Identifier")
     invoice_number = fields.Integer(string="Invoice Number")
     validation_controller = fields.Boolean(string="Validation controller", default=False)
@@ -202,8 +236,13 @@ class SalonOrder(models.Model):
     chair_user = fields.Many2one('res.users', string="Artist User")
     salon_order_created_user = fields.Integer(string="Salon Order Created User",
                                               default=lambda self: self._uid)
+
     deposit = fields.Float(string="Deposit")
     invoiced = fields.Boolean(string='Invoiced',default=False)
+    invoice_id = fields.Many2one('account.invoice')
+    amount = fields.Monetary(string="Total ", related='invoice_id.amount_total')
+    residual = fields.Monetary(string="Amount Due", related='invoice_id.residual')
+    currency_id = fields.Many2one(related='invoice_id.currency_id')
     state = fields.Selection([
         ('draft', 'Draft'),
         ('scheduled', 'Scheduled'),
@@ -233,7 +272,7 @@ class SalonOrder(models.Model):
             'target': action.target,
             'context': action.context,
             'res_model': action.res_model,
-            'res_id': self.invoice_number,
+            'res_id': self.invoice_id.id,
         }
         return result
     '''
@@ -271,6 +310,7 @@ class SalonOrder(models.Model):
         self.write({
             'state': 'scheduled',
         })
+        '''
 
         balance_request = requests.post('http://api.sudogram.com:8000/v1/Services/GetBalance',
         json={"USERID": "skylight1001","USERPWD":"RJ309X","ACCOUNT":"A2000009"})
@@ -284,6 +324,7 @@ class SalonOrder(models.Model):
 
         else:
             raise ValidationError('insufficient balance')
+        '''
 
     @api.multi
     def salon_validate(self):
@@ -309,6 +350,12 @@ class SalonOrder(models.Model):
 
     @api.multi
     def salon_cancel(self):
+        for r in self:
+            if r.invoice_id and r.invoice_id.state in ['paid','open','draft']:
+                for payment in r.invoice_id.payment_ids:
+                    if payment.state == 'posted':
+                        payment.cancel()
+                r.invoice_id.action_invoice_cancel()
         self.write({
             'state': 'cancelled',
         })
@@ -361,10 +408,12 @@ class SalonOrder(models.Model):
             'currency_id': currency_salon,
             'journal_id': self.env['account.journal'].search([('name', '=', 'Customer Invoices')], limit=1).id,
             'origin': self.name,
+            'branch_id': self.branch_id.id,
             'company_id': company_id.id,
+            'team_id': 2,
         }
         inv_id = inv_obj.create(inv_data)
-        self.invoice_number = inv_id
+        self.invoice_id = inv_id
         product_id = self.env['product.product'].search([("name", "=", "Salon Service")])
         for records in self.order_line:
             if product_id.property_account_income_id.id:
@@ -408,14 +457,17 @@ class SalonOrder(models.Model):
             result = {'type': 'ir.actions.act_window_close'}
         self.invoiced = True
         self.inv_stage_identifier = True
+        '''
         invoiced_records = self.env['salon.order'].search([('stage_id', 'in', [3, 4]),
                                                            ('chair_id', '=', self.chair_id.id)])
-        total = 0
-        for rows in invoiced_records:
-            invoiced_date = rows.date
-            invoiced_date = invoiced_date[0:10]
-            if invoiced_date == str(date.today()):
-                total = total + rows.price_subtotal
+                                                           total = 0
+                                                           for rows in invoiced_records:
+                                                               invoiced_date = rows.date
+                                                               invoiced_date = invoiced_date[0:10]
+                                                               if invoiced_date == str(date.today()):
+                                                                   total = total + rows.price_subtotal
+                                                           '''
+
         '''
         self.chair_id.collection_today = total
         self.chair_id.number_of_orders = len(self.env['salon.order'].search([("chair_id", "=", self.chair_id.id),
@@ -443,6 +495,17 @@ class SalonServices(models.Model):
 
 class SalonOrderLine(models.Model):
     _name = 'salon.order.lines'
+    @api.model
+    def _get_default_branch_domain(self):
+        return [('id', 'in', self.env.user.branch_ids.ids)]
+
+    @api.model
+    def _get_default_branch(self):
+        user_obj = self.env['res.users']
+        branch_id = user_obj.browse(self.env.user.id).branch_id
+        return branch_id
+
+    branch_id=fields.Many2one('res.branch', 'Branch', default=_get_default_branch,domain=_get_default_branch_domain)
 
     service_id = fields.Many2one('salon.service', string="Service")
     price = fields.Float(string="Price")
@@ -470,70 +533,3 @@ class SalonStages(models.Model):
     _name = 'salon.stages'
 
     name = fields.Char(string="Name", required=True, translate=True)
-class Payment(models.Model):
-    _inherit = 'account.payment'
-    cash_register_id = fields.Many2one('account.bank.statement',
-        ondelete='set null',domain=lambda self:[('state', '=', 'open'),('journal_id','=',self.journal_id.id),('date', '=', str(datetime.now().date())),('company_id','child_of',[self.env.user.company_id.id])])
-
-    registered = fields.Boolean(default=False)
-    register = fields.Boolean(default=True,string="Add to cash register")
-    @api.onchange('journal_id')
-    def _onchange_journal(self):
-        if self.journal_id:
-
-            self.currency_id = self.journal_id.currency_id or self.company_id.currency_id
-            # Set default payment method (we consider the first to be the default one)
-            payment_methods = self.payment_type == 'inbound' and self.journal_id.inbound_payment_method_ids or self.journal_id.outbound_payment_method_ids
-            self.payment_method_id = payment_methods and payment_methods[0] or False
-            # Set payment method domain (restrict to methods enabled for the journal and to selected payment type)
-            payment_type = self.payment_type in ('outbound', 'transfer') and 'outbound' or 'inbound'
-            user = self.env.user
-            for r in self:
-                payment_journal = r.journal_id.id
-                r.cash_register_id = self.env['account.bank.statement'].search([('state', '=', 'open'),('journal_id', '=', self.journal_id.id),('date', '=', str(datetime.now().date()))], limit=1)
-            return {
-            'domain': {
-            'payment_method_id': [('payment_type', '=', payment_type), ('id', 'in', payment_methods.ids)],
-            'cash_register_id': [('state', '=', 'open'),('journal_id', '=', self.journal_id.id),('date', '=', str(datetime.now().date())),('company_id','child_of',[self.env.user.company_id.id])]}
-            }
-        return {}
-    @api.multi
-    def post(self):
-        res = super(Payment, self).post()
-        cash_statement_line=self.env['account.bank.statement.line']
-        #company=self.env['res.company']._company_default_get('account.invoice')
-        for column in self:
-            cash_register_id=column.cash_register_id.id
-            date=column.payment_date
-
-        for r in self:
-            inserted_cash_statement_line=cash_statement_line.create({
-            'name':r.communication,
-            'amount':r.amount if r.payment_type == 'inbound' else r.amount * -1,
-            'date':date,
-            'ref':r.name,
-            'statement_id':cash_register_id,
-            'partner_id':r.partner_id.id,
-            })
-        self.write({
-            'registered': True,
-        })
-
-        return res
-    @api.onchange('payment_date')
-    def _onchange_payment_date(self):
-        for r in self:
-            payment_journal = r.journal_id.id
-            r.cash_register_id = self.env['account.bank.statement'].search(
-            [('state', '=', 'open'),
-            ('journal_id', '=', self.journal_id.id),
-            ('date', '=', str(self.payment_date))], limit=1)
-        return {
-        'domain': {
-        'cash_register_id': [
-        ('state', '=', 'open'),
-        ('journal_id', '=', self.journal_id.id),
-        ('date', '=', str(self.payment_date)),
-        ('company_id','child_of',[self.env.user.company_id.id])
-        ]}
-        }

@@ -1,0 +1,42 @@
+<odoo>
+  <data>
+        <record id="view_bank_statement_search" model="ir.ui.view">
+            <field name="name">account.bank.statement.search</field>
+            <field name="model">account.bank.statement</field>
+            <field name="arch" type="xml">
+                <search string="Search Bank Statements">
+                    <field name="name" string="Bank Statement"/>
+                    <field name="date"/>
+                    <filter string="Draft" name="draft" domain="[('state','=','open')]"/>
+                    <filter string="Confirmed" domain="[('state','=','confirm')]"/>
+                    <field name="journal_id" domain="[('type', '=', 'bank')]" />
+                    <group expand="0" string="Group By">
+                        <filter string="Journal" context="{'group_by': 'journal_id'}"/>
+                        <filter string="Status" context="{'group_by': 'state'}"/>
+                        <filter string="Date" context="{'group_by': 'date'}"/>
+                        </group>
+                </search>
+            </field>
+        </record>
+        <record id="action_account_journal_form" model="ir.actions.act_window">
+            <field name="name">Cash Statements</field>
+            <field name="res_model">account.bank.statement</field>
+            <field name="view_type">form</field>
+            <field name="view_mode">tree,form,pivot,graph</field>
+            <field name="domain">[('journal_id.type', '=', 'cash')]</field>
+            <field name="context">{'journal_type':'cash','search_default_draft':1}</field>
+            <field name="search_view_id" ref="view_bank_statement_search"/>
+            <field name="help" type="html">
+              <p class="oe_view_nocontent_create">
+                Click to register a cash statement.
+              </p>
+            </field>
+        </record>
+
+        <menuitem id="menu_action_cash_statement"
+             action="action_account_journal_form"
+             name="Cash Statement"
+             parent="salon_management_salon"/>
+
+</data>
+</odoo>

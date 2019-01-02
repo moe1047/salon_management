@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+
 <odoo>
     <data>
         <record id="salon_service_form" model="ir.ui.view">

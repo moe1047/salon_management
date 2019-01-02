@@ -27,7 +27,9 @@ from odoo.http import request
 
 
 class SalonBookingWeb(http.Controller):
-
+    @http.route('/academy/academy/', auth='public')
+    def index(self, **kw):
+        return "Hello, world"
     @http.route('/page/salon_details', csrf=False, type="http", methods=['POST', 'GET'], auth="public", website=True)
     def salon_details(self, **kwargs):
 

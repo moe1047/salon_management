@@ -26,8 +26,7 @@
 
             </field>
         </record>
-    </data>
-    <data>
+
         <record model="ir.ui.view" id="invoice_payment_form_view">
             <field name="name">account.payment</field>
             <field name="model">account.payment</field>

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+
 <odoo>
     <data>
       <act_window name="Notify by Sms"
@@ -19,6 +19,8 @@
                       <field name="customer_name" string="Customer Name" select="1"/>
                       <field name="customer_number" string="Phone Number" select="1"/>
                       <field name="chair_id" string="Artist"/>
+                      <field name="branch_id" string="Branch"/>
+
                   <newline/>
                   <group expand="0" string="Group By..." colspan="11" col="11">
                       <filter string="Artist" context="{'group_by':'chair_id'}"/>
@@ -53,13 +55,16 @@
             <field name="name">salon_order_tree.tree</field>
             <field name="model">salon.order</field>
             <field name="arch" type="xml">
-                <tree>
+                <tree decoration-danger="residual > 0">
                     <field name="name"/>
+                    <field name="partner_id"/>
                     <field name="chair_id"/>
+                    <field name="branch_id" options="{'no_create': True}"/>
                     <field name="start_time"/>
                     <field name="end_time"/>
                     <field name="time_taken_total" widget="float_time"/>
-                    <field name="price_subtotal"/>
+                    <field name="price_subtotal" sum="Total"/>
+                    <field name="residual" sum="Total Amount Due"/>
                     <field name="state"/>
                 </tree>
             </field>
@@ -125,9 +130,9 @@
                     <header>
                         <button name="salon_confirm" attrs="{'invisible': [('state', 'in', ('scheduled','closed','cancelled'))]}" string="Confirm" type="object"
                                 class="oe_highlight"/>
-                        <button name="salon_invoice_create" attrs="{'invisible': [('invoiced', '=', True)]}" string="Create Invoice"
+                        <button name="salon_invoice_create" attrs="{'invisible': ['|',('invoiced', '=', True),('state', 'in', ['draft'])]}" string="Create Invoice"
                                 type="object" class="oe_highlight"/>
-                        <button name="salon_cancel" string="Cancel" attrs="{'invisible': [('state', 'in', ('cancelled','closed'))]}" type="object"/>
+                        <button confirm="Are you sure you want to cancel the service?" name="salon_cancel" string="Cancel" attrs="{'invisible': [('state', 'in', ('cancelled','closed'))]}" type="object"/>
                         <button name="salon_close" attrs="{'invisible': [('state', 'in', ('cancelled','closed','draft'))]}" string="Close" type="object"/>
                         <field name="state" widget="statusbar"/>
                     </header>
@@ -143,12 +148,11 @@
                         </div>
                         <group>
                             <group>
-                                <field name="partner_id" domain="[('partner_salon','=',True)]" attrs="{'readonly': [('state', 'in', ('cancelled','closed'))]}"/>
-                                <field name="customer_name" attrs="{'readonly': [('state', 'in', ('cancelled','closed'))]}"/>
-                                <field name="customer_number" attrs="{'readonly': [('state', 'in', ('cancelled','closed'))]}"/>
+                                <field name="partner_id" domain="[('partner_salon','=',True)]" attrs="{'readonly': [('state', 'in', ('cancelled','closed'))]}" context="{'default_partner_salon':1}"/>
                                 <field name="chair_id" domain="[('active_booking_chairs','!=',True)]" attrs="{'readonly': [('state', 'in', ('cancelled','closed'))]}"/>
                             </group>
                             <group>
+                                <field name="branch_id" attrs="{'readonly': [('state', 'in', ('cancelled','closed'))]}"/>
                                 <field name="booking_identifier" invisible="1"/>
                                 <field name="invoiced" invisible="1"/>
                                 <field name="date" attrs="{'readonly': [('state', 'in', ('cancelled','closed'))]}" invisible="1"/>
@@ -251,11 +255,11 @@
             <field name="model">salon.order</field>
             <field name="priority" eval="2"/>
             <field name="arch" type="xml">
-                <calendar string="Appointments" date_start="start_time" date_stop="end_time" date_delay="time_taken_total"
-                             display="[customer_name]" quick_add="False" mode="week">
+                <calendar string="Appointments" date_start="start_time" date_stop="end_time" date_delay="time_taken_total" quick_add="False" mode="week" color="chair_id">
                     <field name="customer_name"/>
                     <field name="chair_id"/>
                     <field name="date"/>
+                    <field name="branch_id" options="{'no_create': True}"/>
                 </calendar>
             </field>
         </record>

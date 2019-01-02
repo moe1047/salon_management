@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+
 <odoo>
     <data>
         <record id="salon_management_kanban" model="ir.ui.view" >
@@ -61,7 +61,7 @@
                                         </span>
                                     </div>
                                 </div>
-                                
+
                                 <div t-if="record.active_booking_chairs.raw_value == true">
                                     <div class=" o_primary style_collection_booking">
                                         <span class=" o_primary style_collection_booking">
