@@ -59,15 +59,10 @@ class SequenceUpdaterSalon(models.Model):
     _name = 'salon.sequence.updater'
 
     sequence_salon = fields.Char(string="Salon Sequence")
-
-
-
 class UserSalon(models.Model):
     _inherit = 'res.users'
 
     user_salon_active = fields.Boolean(string="Active Salon Users")
-
-
 class SalonChair(models.Model):
     _name = 'salon.chair'
     name = fields.Char(string="Artist name", required=True)
@@ -142,8 +137,6 @@ class SalonChair(models.Model):
                 if invoiced_date == str(date.today()):
                     total = total + rows.price_subtotal
             chair_obj.collection_today = total
-
-
 class SalonChairUserLines(models.Model):
     _name = 'salon.chair.user'
 
@@ -167,8 +160,6 @@ class SalonChairUserLines(models.Model):
             records.write({'user_salon_active': False})
         cr['read_only_checker'] = True
         return super(SalonChairUserLines, self).create(cr)
-
-
 class SalonOrder(models.Model):
     _name = 'salon.order'
     @api.model
@@ -483,16 +474,12 @@ class SalonOrder(models.Model):
             if order.state== "closed":
                 raise UserError(_("You can't delete closed order!"))
         return super(SalonOrder, self).unlink()
-
-
 class SalonServices(models.Model):
     _name = 'salon.service'
 
     name = fields.Char(string="Name")
     price = fields.Float(string="Price")
     time_taken = fields.Float(string="Time Taken", help="Approximate time taken for this service in Hours")
-
-
 class SalonOrderLine(models.Model):
     _name = 'salon.order.lines'
     @api.model
@@ -527,8 +514,6 @@ class SalonOrderLine(models.Model):
     @api.onchange('price_subtotal')
     def onchange_subtotal(self):
         self.price = self.price_subtotal
-
-
 class SalonStages(models.Model):
     _name = 'salon.stages'
 
